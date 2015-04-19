@@ -1,0 +1,5 @@
+pred1	rel1	arg1	rel2	arg2	rel3	arg3
+pred2	rel4	arg1	rel2	arg2	rel3	arg1
+pred1	rel1	arg1	rel2	arg2	rel3	arg3
+pred2	rel4	arg1	rel2	arg2	rel3	arg1
+pred1	rel1	arg1	rel2	arg2	rel3	arg3
