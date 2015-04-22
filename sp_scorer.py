@@ -3,10 +3,11 @@ from theano import tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
 
 class SPScorer(object):
-    def __init__(self, numargs, embed_size, pred_vocab_size, arg_vocab_size, initial_pred_rep=None, initial_arg_rep = None, lr=0.01):
+    def __init__(self, numargs, embed_size, pred_vocab_size, arg_vocab_size, initial_pred_rep=None, initial_arg_rep = None, margin = 5, lr=0.01, activation=T.nnet.sigmoid):
         numpy_rng = numpy.random.RandomState(12345)
         theano_rng = RandomStreams(54321)
         self.lr = lr
+        #margin = 5
         # Initializing predicate representations
         if initial_pred_rep is not None:
             num_preds, pred_dim = initial_pred_rep.shape
@@ -38,17 +39,17 @@ class SPScorer(object):
         self.arg_inds = T.iscalars(numargs)
         pred = self.pred_rep[self.pred_ind].reshape((1, embed_size))
         args = self.arg_rep[self.arg_inds].reshape((1, embed_size * numargs))
-        pred_arg = T.concatenate([pred, args], axis=1)
+        pred_arg = activation(T.concatenate([pred, args], axis=1))
         
         rand_pred_ind = theano_rng.random_integers(low=0, high=pred_vocab_size-1)
         rand_arg_inds = theano_rng.random_integers([1, numargs], low=0, high=arg_vocab_size-1)
         rand_pred = self.pred_rep[rand_pred_ind].reshape((1, embed_size))
         rand_args = self.arg_rep[rand_arg_inds].reshape((1, embed_size * numargs))
-        rand_pred_arg = T.concatenate([rand_pred, rand_args], axis=1)
+        rand_pred_arg = activation(T.concatenate([rand_pred, rand_args], axis=1))
 
         self.corr_score = T.dot(pred_arg, self.scorer)
         rand_score = T.dot(rand_pred_arg, self.scorer)
-        self.margin_loss = T.sum(T.maximum(0, 1 - self.corr_score + rand_score))
+        self.margin_loss = T.sum(T.maximum(0, margin - self.corr_score + rand_score))
 
         self.params = [self.pred_rep, self.arg_rep, self.scorer]
         self.score_inputs = [self.pred_ind] + list(self.arg_inds)

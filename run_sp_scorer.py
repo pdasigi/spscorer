@@ -4,6 +4,7 @@ import random
 
 embed_size = 50
 maxiter = 10
+margin = 5
 valid_prop = 0.1
 
 arg_labels = ['ARG0', 'ARG1', 'ARG2', 'AM-LOC', 'AM-TMP']
@@ -57,7 +58,7 @@ for pred_ind, arg_inds in valid_data:
     corr_arg_inds = arg_inds[:corr_pos] + [corr_ind] + arg_inds[corr_pos+1:]
     corr_valid_data.append((pred_ind, corr_arg_inds))
 
-sps = SPScorer(numargs, embed_size, pred_vocab_size, arg_vocab_size)
+sps = SPScorer(numargs, embed_size, pred_vocab_size, arg_vocab_size, margin=margin)
 sps_train = sps.get_train_function()
 sps_score = sps.get_score_function()
 
