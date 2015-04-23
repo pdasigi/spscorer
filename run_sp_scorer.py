@@ -1,6 +1,7 @@
 from sp_scorer import SPScorer
 import sys
 import random, operator
+import cPickle
 
 embed_size = 50
 maxiter = 10
@@ -53,6 +54,15 @@ args = {x: i for (i, x) in enumerate([a for (a, _) in sorted_arg_freqs[arg_oov_n
 args['UNK'] = 0
 args['NULL'] = 1
 
+pred_file = open("preds.txt", "w")
+for pred in preds:
+    print >>pred_file, pred, preds[pred]
+pred_file.close()
+arg_file = open("args.txt", "w")
+for arg in args:
+    print >>arg_file, arg, args[arg]
+arg_file.close()
+
 train_valid_data = []
 
 for pred, arg_words in train_valid_text:
@@ -101,13 +111,17 @@ for itr in range(maxiter):
         tl = sps_train(*tr_inputs)
         train_loss += tl
     print >>sys.stderr, "Finished iter %d, average train loss is %f"%(itr+1, train_loss/train_size)
-    num_orig_better = 0
-    for (pi, ais), (_, cais) in zip(valid_data, corr_valid_data):
-        sc = sps_score(pi, *ais)
-        csc = sps_score(pi, *cais)
-        if sc > csc:
-            num_orig_better += 1
-    print >>sys.stderr, "\tvalidation accuracy is %f"%(float(num_orig_better)/valid_size)
     if train_loss == 0.0:
         break
 
+# Check validation accuracy at the end of training
+num_orig_better = 0
+for (pi, ais), (_, cais) in zip(valid_data, corr_valid_data):
+    sc = sps_score(pi, *ais)
+    csc = sps_score(pi, *cais)
+    if sc > csc:
+        num_orig_better += 1
+print >>sys.stderr, "Validation accuracy is %f"%(float(num_orig_better)/valid_size)
+paramfile = open("spscorer_param.pkl", "wb")
+cPickle.dump((sps.pred_rep.get_value(), sps.arg_rep.get_value(), sps.scorer.get_value()), paramfile)
+paramfile.close()
