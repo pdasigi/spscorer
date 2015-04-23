@@ -47,9 +47,9 @@ class SPScorer(object):
         rand_args = self.arg_rep[rand_arg_inds].reshape((1, embed_size * numargs))
         rand_pred_arg = activation(T.concatenate([rand_pred, rand_args], axis=1))
 
-        self.corr_score = T.dot(pred_arg, self.scorer)
-        rand_score = T.dot(rand_pred_arg, self.scorer)
-        self.margin_loss = T.sum(T.maximum(0, margin - self.corr_score + rand_score))
+        self.corr_score = T.sum(T.dot(pred_arg, self.scorer))
+        rand_score = T.sum(T.dot(rand_pred_arg, self.scorer))
+        self.margin_loss = T.maximum(0, margin - self.corr_score + rand_score)
 
         self.params = [self.pred_rep, self.arg_rep, self.scorer]
         self.score_inputs = [self.pred_ind] + list(self.arg_inds)
