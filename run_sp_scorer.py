@@ -1,48 +1,80 @@
 from sp_scorer import SPScorer
 import sys
-import random
+import random, operator
 
 embed_size = 50
 maxiter = 10
 margin = 5
 valid_prop = 0.1
+oov_prop = 0.1 #proportion of pred and arg vocab that will be considered OOV
 
 arg_labels = ['ARG0', 'ARG1', 'ARG2', 'AM-LOC', 'AM-TMP']
 train_file = open(sys.argv[1])
-preds = {} # pred: index
-args = {'NULL':0} # arg: index
 numargs = len(arg_labels)
 
-train_valid_data = []
 
+train_valid_text = []
+pred_freqs = {}
+arg_freqs = {}
 for line in train_file:
     parts = line.strip().split('\t')
-    pred = parts[0]
-    if pred in preds:
-        pred_ind = preds[pred]
+    pred = parts[0].lower()
+    if pred in pred_freqs:
+        pred_freqs[pred] += 1
     else:
-        pred_ind = len(preds)
-        preds[pred] = pred_ind
-    arg_inds = [0]*len(arg_labels)
+        pred_freqs[pred] = 1
+    arg_words = ['NULL'] * len(arg_labels)
     for i in range(1, len(parts), 2):
         if parts[i] in arg_labels:
             arg_label = parts[i]
-            arg = parts[i+1]
-            if arg in args:
-                arg_ind = args[arg]
+            arg = parts[i+1].lower()
+            arg_words[arg_labels.index(arg_label)] = arg
+            if arg in arg_freqs:
+                arg_freqs[arg] += 1
             else:
-                arg_ind = len(args)
-                args[arg] = arg_ind
-            arg_inds[arg_labels.index(arg_label)] = arg_ind
-    train_valid_data.append((pred_ind, arg_inds))
+                arg_freqs[arg] = 1
+    train_valid_text.append((pred, arg_words))
 train_file.close()
+
+# Determine pred and arg oovs
+orig_pred_vocab_size = len(pred_freqs)
+sorted_pred_freqs = sorted(pred_freqs.items(), key=operator.itemgetter(1))
+pred_oov_num = int(oov_prop * orig_pred_vocab_size)
+pred_oov = [p for (p, _) in sorted_pred_freqs[:pred_oov_num]]
+orig_arg_vocab_size = len(arg_freqs)
+sorted_arg_freqs = sorted(arg_freqs.items(), key=operator.itemgetter(1))
+arg_oov_num = int(oov_prop * orig_arg_vocab_size)
+arg_oov = [a for (a, _) in sorted_arg_freqs[:arg_oov_num]]
+
+# Now create index non-oov preds and args
+preds = {x: i for (i, x) in enumerate([p for (p, _) in sorted_pred_freqs[pred_oov_num:]], 1)}
+preds['UNK'] = 0
+args = {x: i for (i, x) in enumerate([a for (a, _) in sorted_arg_freqs[arg_oov_num:]], 2)}
+args['UNK'] = 0
+args['NULL'] = 1
+
+train_valid_data = []
+
+for pred, arg_words in train_valid_text:
+    if pred in preds:
+        pred_ind = preds[pred]
+    else:
+        pred_ind = preds['UNK']
+    arg_inds = []
+    for arg in arg_words:
+        if arg in args:
+            arg_ind = args[arg]
+        else:
+            arg_ind = args['UNK']
+        arg_inds.append(arg_ind)
+    train_valid_data.append((pred_ind, arg_inds))
 
 train_valid_size = len(train_valid_data)
 print >>sys.stderr, "All data size: %d"%train_valid_size
 pred_vocab_size = len(preds)
-print >>sys.stderr, "Total number of predicate types: %d"%pred_vocab_size
+print >>sys.stderr, "Total number of predicate types: %d (%d OOV)"%(pred_vocab_size, pred_oov_num)
 arg_vocab_size = len(args)
-print >>sys.stderr, "Total number of argument types: %d"%arg_vocab_size
+print >>sys.stderr, "Total number of argument types: %d (%d OOV)"%(arg_vocab_size, arg_oov_num)
 
 valid_size = int(valid_prop * train_valid_size)
 random.shuffle(train_valid_data)
