@@ -101,27 +101,61 @@ for pred_ind, arg_inds in valid_data:
     corr_valid_data.append((pred_ind, corr_arg_inds))
 
 sps = SPScorer(numargs, embed_size, pred_vocab_size, arg_vocab_size, margin=margin)
-sps_train = sps.get_train_function()
+sps_score_train = sps.get_score_train_function()
+sps_indicator_train = sps.get_indicator_train_function()
 sps_score = sps.get_score_function()
+sps_indicator = sps.get_indicator_function()
 
+# Scorer training
 for itr in range(maxiter):
     train_loss = 0.0
     for pred_ind, arg_inds in train_data:
         tr_inputs = [pred_ind] + arg_inds
-        tl = sps_train(*tr_inputs)
+        tl = sps_score_train(*tr_inputs)
         train_loss += tl
-    print >>sys.stderr, "Finished iter %d, average train loss is %f"%(itr+1, train_loss/train_size)
+    print >>sys.stderr, "Finished iter %d, average score train loss is %f"%(itr+1, train_loss/train_size)
     if train_loss == 0.0:
         break
 
-# Check validation accuracy at the end of training
+# Check validation accuracy at the end of score training
 num_orig_better = 0
 for (pi, ais), (_, cais) in zip(valid_data, corr_valid_data):
     sc = sps_score(pi, *ais)
     csc = sps_score(pi, *cais)
     if sc > csc:
         num_orig_better += 1
-print >>sys.stderr, "Validation accuracy is %f"%(float(num_orig_better)/valid_size)
+print >>sys.stderr, "Scoring validation accuracy is %f"%(float(num_orig_better)/valid_size)
+
+# Indicator training
+for itr in range(maxiter):
+    train_loss = 0.0
+    for pred_ind, arg_inds in train_data:
+        tr_inputs = [pred_ind] + arg_inds
+        tl = sps_indicator_train(*tr_inputs)
+        train_loss += tl
+    print >>sys.stderr, "Finished iter %d, average indicator train loss is %f"%(itr+1, train_loss/train_size)
+    if train_loss == 0.0:
+        break
+
+# Check validation accuracy at the end of indicator training
+num_orig_better = 0
+for (pi, ais), (_, cais) in zip(valid_data, corr_valid_data):
+    sc = sps_score(pi, *ais)
+    csc = sps_score(pi, *cais)
+    if sc > csc:
+        num_orig_better += 1
+print >>sys.stderr, "Scoring validation accuracy is %f"%(float(num_orig_better)/valid_size)
+
+num_right_indic = 0
+for (pi, ais), (_, cais) in zip(valid_data, corr_valid_data):
+    indics = sps_indicator(pi, *cais)
+    for ai, cai, indic in zip(ais, cais, indics[0]):
+        if ai != cai and indic > 0.5:
+            num_right_indic += 1
+        elif ai == cai and indic <= 0.5:
+            num_right_indic += 1
+print >>sys.stderr, "Indicator validation accuracy is %f"%(float(num_right_indic)/(valid_size * numargs))
+
 paramfile = open("spscorer_param.pkl", "wb")
-cPickle.dump((sps.pred_rep.get_value(), sps.arg_rep.get_value(), sps.scorer.get_value()), paramfile)
+cPickle.dump((sps.pred_rep.get_value(), sps.arg_rep.get_value(), sps.scorer.get_value(), sps.indicator.get_value()), paramfile)
 paramfile.close()
